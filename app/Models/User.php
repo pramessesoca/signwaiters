@@ -20,8 +20,11 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'username',
         'email',
         'password',
+        'is_admin',
+        'token_api',
     ];
 
     /**
@@ -32,6 +35,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'token_api',
     ];
 
     /**
@@ -44,6 +48,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_admin' => 'boolean',
         ];
     }
 }
