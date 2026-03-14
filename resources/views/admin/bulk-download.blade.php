@@ -5,7 +5,7 @@
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h2 class="text-xl font-bold text-slate-900">Bulk Download ZIP</h2>
-                <p class="text-sm text-slate-600">Proses membuat satu ZIP dari file request (`file_req`) sesuai filter dashboard.</p>
+                <p class="text-sm text-slate-600">Proses membuat satu ZIP dari file request (`file_req`) sesuai filter dashboard. Maksimal 100 file per batch.</p>
             </div>
             <div class="flex gap-2">
                 <form action="{{ route('admin.bulk_download.clear') }}" method="POST" onsubmit="return confirm('Hapus semua riwayat bulk download selesai?')">

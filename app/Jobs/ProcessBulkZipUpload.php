@@ -19,6 +19,10 @@ class ProcessBulkZipUpload implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public int $timeout = 1800;
+
+    private const MAX_FILES = 100;
+
     public function __construct(
         public int $bulkUploadId,
         public string $zipPath
@@ -34,6 +38,7 @@ class ProcessBulkZipUpload implements ShouldQueue
                 'summary' => [
                     'token_tidak_ditemukan' => 0,
                     'format_invalid' => 0,
+                    'melewati_batas_100' => 0,
                 ],
                 'items' => [],
             ],
@@ -48,9 +53,24 @@ class ProcessBulkZipUpload implements ShouldQueue
             }
 
             $pdfFiles = $this->collectPdfFilesFromZip($zipFile, $tmpRoot);
-            $bulk->update(['total_file' => count($pdfFiles)]);
+            $selectedPdfFiles = array_slice($pdfFiles, 0, self::MAX_FILES);
+            $bulk->update(['total_file' => count($selectedPdfFiles)]);
 
-            foreach ($pdfFiles as $pdfPath) {
+            if (count($pdfFiles) > self::MAX_FILES) {
+                $log = $bulk->error_log_json ?? ['summary' => [], 'items' => []];
+                $summary = $log['summary'] ?? [];
+                $items = $log['items'] ?? [];
+                $summary['melewati_batas_100'] = count($pdfFiles) - self::MAX_FILES;
+                $items[] = [
+                    'file' => null,
+                    'reason' => 'Sebagian file dilewati karena batas maksimal 100 file per proses.',
+                ];
+                $log['summary'] = $summary;
+                $log['items'] = $items;
+                $bulk->update(['error_log_json' => $log]);
+            }
+
+            foreach ($selectedPdfFiles as $pdfPath) {
                 $this->processOnePdf($bulk, $pdfPath);
             }
 

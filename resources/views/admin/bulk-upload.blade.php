@@ -5,7 +5,7 @@
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h2 class="text-xl font-bold text-slate-900">Bulk Upload ZIP TTE</h2>
-                <p class="text-sm text-slate-600">Upload ZIP (boleh berisi ZIP + PDF). Format file PDF: <code>TOKEN_namafile.pdf</code>.</p>
+                <p class="text-sm text-slate-600">Upload ZIP (boleh berisi ZIP + PDF). Format file PDF: <code>TOKEN_namafile.pdf</code>. Maksimal 100 file PDF diproses per batch.</p>
             </div>
             <div class="flex gap-2">
                 <form action="{{ route('admin.bulk_upload.clear') }}" method="POST" onsubmit="return confirm('Hapus semua riwayat bulk upload selesai?')">
@@ -68,6 +68,7 @@
         </div>
         <div class="mt-3 rounded-xl bg-amber-50 p-3 text-sm">
             <p class="text-amber-700">Format Nama Invalid: <strong id="sum-format-invalid">0</strong></p>
+            <p class="text-amber-700">Melewati Batas 100: <strong id="sum-limit-100">0</strong></p>
         </div>
 
         <div class="mt-4">
@@ -100,6 +101,7 @@
                     setText('sum-failed', data.failed || 0);
                     setText('sum-token-miss', (data.summary && data.summary.token_tidak_ditemukan) || 0);
                     setText('sum-format-invalid', (data.summary && data.summary.format_invalid) || 0);
+                    setText('sum-limit-100', (data.summary && data.summary.melewati_batas_100) || 0);
 
                     const list = document.getElementById('error-list');
                     list.innerHTML = '';

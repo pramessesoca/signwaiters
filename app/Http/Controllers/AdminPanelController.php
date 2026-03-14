@@ -103,6 +103,7 @@ class AdminPanelController extends Controller
         $summary = $bulkUpload->error_log_json['summary'] ?? [
             'token_tidak_ditemukan' => 0,
             'format_invalid' => 0,
+            'melewati_batas_100' => 0,
         ];
         $items = $bulkUpload->error_log_json['items'] ?? [];
 
@@ -317,8 +318,14 @@ class AdminPanelController extends Controller
 
     public function generateUlangToken(TteRequest $tteRequest)
     {
+        $tokenBaru = TteRequest::buatTokenUnik();
+        $fileReqBaru = $this->renameFileDenganTokenBaru($tteRequest->file_req, $tokenBaru);
+        $fileTteBaru = $this->renameFileDenganTokenBaru($tteRequest->file_tte, $tokenBaru);
+
         $tteRequest->update([
-            'token' => TteRequest::buatTokenUnik(),
+            'token' => $tokenBaru,
+            'file_req' => $fileReqBaru ?? $tteRequest->file_req,
+            'file_tte' => $fileTteBaru ?? $tteRequest->file_tte,
             'kedaluwarsa' => now()->addDays(7),
         ]);
 
@@ -396,6 +403,41 @@ class AdminPanelController extends Controller
         }
 
         return $q;
+    }
+
+    private function renameFileDenganTokenBaru(?string $oldPath, string $tokenBaru): ?string
+    {
+        if (! $oldPath) {
+            return null;
+        }
+
+        $disk = Storage::disk('s3');
+        if (! $disk->exists($oldPath)) {
+            return null;
+        }
+
+        $dir = trim(str_replace('\\', '/', dirname($oldPath)), '.');
+        $filename = basename($oldPath);
+        $ext = pathinfo($filename, PATHINFO_EXTENSION);
+        $nameNoExt = pathinfo($filename, PATHINFO_FILENAME);
+
+        $suffix = $nameNoExt;
+        if (str_contains($nameNoExt, '_')) {
+            $parts = explode('_', $nameNoExt, 2);
+            $suffix = $parts[1] !== '' ? $parts[1] : $parts[0];
+        }
+
+        $newFilename = $tokenBaru.'_'.$suffix.($ext ? '.'.$ext : '');
+        $newPath = ($dir !== '' && $dir !== '/') ? $dir.'/'.$newFilename : $newFilename;
+
+        if ($newPath === $oldPath) {
+            return $oldPath;
+        }
+
+        $disk->copy($oldPath, $newPath);
+        $disk->delete($oldPath);
+
+        return $newPath;
     }
 }
 

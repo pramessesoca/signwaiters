@@ -17,6 +17,10 @@ class ProcessBulkDownloadZip implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public int $timeout = 1800;
+
+    private const MAX_FILES = 100;
+
     public function __construct(
         public int $bulkDownloadId,
         public array $filter
@@ -34,9 +38,8 @@ class ProcessBulkDownloadZip implements ShouldQueue
 
         $query = $this->buildFilteredQuery($this->filter);
         $query->orderBy($this->filter['sort'] ?? 'created_at', $this->filter['dir'] ?? 'desc');
-
-        $total = (clone $query)->count();
-        $bulk->update(['total_file' => $total]);
+        $rows = $query->limit(self::MAX_FILES)->get();
+        $bulk->update(['total_file' => $rows->count()]);
 
         $zipDir = Storage::disk('local')->path('bulk-download-zips');
         if (! is_dir($zipDir)) {
@@ -55,63 +58,61 @@ class ProcessBulkDownloadZip implements ShouldQueue
         $errorLog = [];
 
         try {
-            $query->chunkById(200, function ($rows) use ($zip, &$usedNames, &$resultLog, &$errorLog, $bulk) {
-                foreach ($rows as $row) {
-                    $sourcePath = $row->file_req;
-                    if (! $sourcePath || ! Storage::disk('s3')->exists($sourcePath)) {
-                        $errorLog[] = [
-                            'token' => $row->token,
-                            'file' => $sourcePath,
-                            'reason' => 'file_tidak_ditemukan',
-                        ];
-                        $bulk->increment('processed');
-                        $bulk->increment('failed');
-                        $bulk->update(['error_log_json' => $errorLog]);
-                        continue;
-                    }
-
-                    $filename = basename($sourcePath);
-                    $filenameInZip = $this->makeUniqueFilename($filename, $usedNames);
-
-                    $stream = Storage::disk('s3')->readStream($sourcePath);
-                    if (! is_resource($stream)) {
-                        $errorLog[] = [
-                            'token' => $row->token,
-                            'file' => $sourcePath,
-                            'reason' => 'gagal_baca_stream',
-                        ];
-                        $bulk->increment('processed');
-                        $bulk->increment('failed');
-                        $bulk->update(['error_log_json' => $errorLog]);
-                        continue;
-                    }
-
-                    $content = stream_get_contents($stream);
-                    fclose($stream);
-                    if ($content === false) {
-                        $errorLog[] = [
-                            'token' => $row->token,
-                            'file' => $sourcePath,
-                            'reason' => 'gagal_baca_konten',
-                        ];
-                        $bulk->increment('processed');
-                        $bulk->increment('failed');
-                        $bulk->update(['error_log_json' => $errorLog]);
-                        continue;
-                    }
-
-                    $zip->addFromString($filenameInZip, $content);
-
-                    $resultLog[] = [
+            foreach ($rows as $row) {
+                $sourcePath = $row->file_req;
+                if (! $sourcePath || ! Storage::disk('s3')->exists($sourcePath)) {
+                    $errorLog[] = [
                         'token' => $row->token,
-                        'source' => $sourcePath,
-                        'zip_name' => $filenameInZip,
+                        'file' => $sourcePath,
+                        'reason' => 'file_tidak_ditemukan',
                     ];
                     $bulk->increment('processed');
-                    $bulk->increment('success');
-                    $bulk->update(['result_log_json' => $resultLog]);
+                    $bulk->increment('failed');
+                    $bulk->update(['error_log_json' => $errorLog]);
+                    continue;
                 }
-            });
+
+                $filename = basename($sourcePath);
+                $filenameInZip = $this->makeUniqueFilename($filename, $usedNames);
+
+                $stream = Storage::disk('s3')->readStream($sourcePath);
+                if (! is_resource($stream)) {
+                    $errorLog[] = [
+                        'token' => $row->token,
+                        'file' => $sourcePath,
+                        'reason' => 'gagal_baca_stream',
+                    ];
+                    $bulk->increment('processed');
+                    $bulk->increment('failed');
+                    $bulk->update(['error_log_json' => $errorLog]);
+                    continue;
+                }
+
+                $content = stream_get_contents($stream);
+                fclose($stream);
+                if ($content === false) {
+                    $errorLog[] = [
+                        'token' => $row->token,
+                        'file' => $sourcePath,
+                        'reason' => 'gagal_baca_konten',
+                    ];
+                    $bulk->increment('processed');
+                    $bulk->increment('failed');
+                    $bulk->update(['error_log_json' => $errorLog]);
+                    continue;
+                }
+
+                $zip->addFromString($filenameInZip, $content);
+
+                $resultLog[] = [
+                    'token' => $row->token,
+                    'source' => $sourcePath,
+                    'zip_name' => $filenameInZip,
+                ];
+                $bulk->increment('processed');
+                $bulk->increment('success');
+                $bulk->update(['result_log_json' => $resultLog]);
+            }
 
             $zip->close();
 

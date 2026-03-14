@@ -19,12 +19,22 @@
     @isset($hasil)
         <div class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
             <h3 class="mb-3 text-lg font-semibold text-slate-900">Hasil Pencarian</h3>
+            @php
+                $badge = match($statusTampil) {
+                    'tunggu' => 'bg-amber-100 text-amber-700',
+                    'setuju' => 'bg-blue-100 text-blue-700',
+                    'tolak' => 'bg-rose-100 text-rose-700',
+                    'siap' => 'bg-emerald-100 text-emerald-700',
+                    'kedaluwarsa' => 'bg-slate-200 text-slate-700',
+                    default => 'bg-slate-100 text-slate-700',
+                };
+            @endphp
             <div class="space-y-1 text-sm text-slate-700">
                 <p>Nama: <strong>{{ $hasil->nama }}</strong></p>
                 <p>Tim: <strong>{{ $hasil->tim }}</strong></p>
                 <p>Token: <strong>{{ $hasil->token }}</strong></p>
                 <p>Status:
-                    <span class="inline-flex rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-800">{{ $statusTampil }}</span>
+                    <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $badge }}">{{ $statusTampil }}</span>
                 </p>
                 <p>Kedaluwarsa: <strong>{{ optional($hasil->kedaluwarsa)->format('d-m-Y H:i') }}</strong></p>
             </div>
