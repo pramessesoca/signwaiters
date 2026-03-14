@@ -4,10 +4,27 @@
     <div class="mb-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
         <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <h2 class="text-xl font-bold text-slate-900">Dashboard Admin</h2>
-            <form action="{{ route('admin.logout') }}" method="POST">
-                @csrf
-                <button class="rounded-xl bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" type="submit">Logout</button>
-            </form>
+            <div class="flex flex-wrap items-center gap-2">
+                <form action="{{ route('admin.request.generate_txt') }}" method="POST">
+                    @csrf
+                    @foreach (request()->query() as $k => $v)
+                        <input type="hidden" name="{{ $k }}" value="{{ $v }}">
+                    @endforeach
+                    <button class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700" type="submit">Generate TXT</button>
+                </form>
+                <form action="{{ route('admin.bulk_download.store') }}" method="POST">
+                    @csrf
+                    @foreach (request()->query() as $k => $v)
+                        <input type="hidden" name="{{ $k }}" value="{{ $v }}">
+                    @endforeach
+                    <button class="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700" type="submit">Bulk Download</button>
+                </form>
+                <a href="{{ route('admin.bulk_upload.form') }}" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Bulk Upload</a>
+                <form action="{{ route('admin.logout') }}" method="POST">
+                    @csrf
+                    <button class="rounded-xl bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" type="submit">Logout</button>
+                </form>
+            </div>
         </div>
     </div>
 
