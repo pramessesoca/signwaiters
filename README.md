@@ -1,63 +1,307 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# SignWaiters - Sistem Permohonan File TTE
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplikasi fullstack Laravel untuk mengelola alur permohonan file TTE:
+- User upload file permohonan + isi data.
+- Sistem generate token unik untuk pelacakan.
+- Admin memproses permohonan dan upload file TTE.
+- User download file berdasarkan token.
 
-## About Laravel
+Penyimpanan file menggunakan MinIO (S3-compatible), cache/session menggunakan Redis, dan proses bulk menggunakan queue worker.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Fitur Utama
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### User (Publik)
+- Form permohonan file (`nama`, `tim`, `file PDF`).
+- Generate token otomatis.
+- Cek status berdasarkan token.
+- Download file TTE jika status `siap`.
+- Badge status berwarna di halaman cek token.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Admin
+- Login admin berbasis `username + password`.
+- Dashboard dengan:
+  - filter status, tim, tanggal
+  - pencarian nama/tim/token
+  - sorting kolom
+  - pagination
+- Aksi per permohonan:
+  - setujui / tolak
+  - upload file TTE
+  - generate ulang token (rename file mengikuti token baru)
+  - hapus data
+- Generate TXT dari hasil filter (dengan numbering 1,2,3,...).
+- Bulk Upload ZIP (dengan progress live polling).
+- Bulk Download ZIP hasil filter (dengan progress live + auto download).
+- Clear riwayat bulk dan clear all bulk.
 
-## Learning Laravel
+## Arsitektur Singkat
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+- Framework: Laravel
+- Database: MySQL
+- File storage: MinIO via disk `s3`
+- Cache/Session: Redis (Predis)
+- Queue: `database` driver + `php artisan queue:work`
+- Frontend: Blade + Tailwind
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Struktur Alur Sistem
 
-## Laravel Sponsors
+1. User submit permohonan PDF.
+2. Sistem simpan file ke MinIO (`request/YYYY/MM/DD/...`) dan buat token 8 karakter.
+3. Admin review data di dashboard.
+4. Admin upload file TTE (manual atau bulk ZIP).
+5. Sistem simpan file TTE ke MinIO (`tte/YYYY/MM/DD/...`) dan update status jadi `siap`.
+6. User download hasil dengan token.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Daftar Status
 
-### Premium Partners
+- `tunggu`
+- `setuju`
+- `tolak`
+- `siap`
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## Contoh Daftar Tim
 
-## Contributing
+- ITSA
+- Monitoring
+- Proteksi
+- Analisis Malware
+- Threat Hunting
+- Cyber Threat Intelligence
+- Digital Forensic
+- Incident Response
+- Infrastruktur
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Requirement
 
-## Code of Conduct
+- PHP 8.2+
+- Composer 2+
+- Node.js 18+ dan npm
+- MySQL 8+
+- Redis
+- MinIO
+- Ekstensi PHP penting: `zip`, `xml`, `tokenizer`, `mbstring`, `openssl`, `pdo_mysql`
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Catatan upload besar:
+- `upload_max_filesize` dan `post_max_size` di `php.ini` harus cukup besar (mis. 100M/120M).
 
-## Security Vulnerabilities
+## Instalasi Lokal
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+1. Clone project lalu install dependency.
 
-## License
+```bash
+composer install
+npm install
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+2. Copy environment file.
 
-## Project Guidance
+```bash
+cp .env.example .env
+```
 
-Panduan implementasi fitur permohonan file TTE tersedia di `docs/tte-implementation-plan.md`.
+3. Generate app key.
+
+```bash
+php artisan key:generate
+```
+
+4. Atur `.env` (contoh inti):
+
+```env
+APP_NAME=SignWaiters
+APP_ENV=local
+APP_DEBUG=true
+APP_URL=http://127.0.0.1:8000
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=signwaiters
+DB_USERNAME=root
+DB_PASSWORD=
+
+QUEUE_CONNECTION=database
+CACHE_STORE=redis
+SESSION_DRIVER=redis
+REDIS_CLIENT=predis
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+
+FILESYSTEM_DISK=s3
+AWS_ACCESS_KEY_ID=minioadmin
+AWS_SECRET_ACCESS_KEY=minioadmin
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=ttedir21
+AWS_ENDPOINT=http://127.0.0.1:9000
+AWS_USE_PATH_STYLE_ENDPOINT=true
+AWS_URL=http://127.0.0.1:9000/ttedir21
+
+ADMIN_NAME=Admin
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=admin12345
+ADMIN_EMAIL=admin@local.test
+```
+
+5. Siapkan tabel DB + queue.
+
+```bash
+php artisan migrate
+```
+
+6. Seed admin default.
+
+```bash
+php artisan db:seed
+```
+
+7. Build asset frontend.
+
+```bash
+npm run dev
+```
+
+8. Jalankan aplikasi.
+
+```bash
+php artisan serve
+```
+
+9. Jalankan worker queue (wajib untuk proses bulk).
+
+```bash
+php artisan queue:work --queue=default --sleep=1 --tries=3 --timeout=1800
+```
+
+## Menjalankan Banyak Worker (Windows PowerShell)
+
+Contoh 4 worker sekaligus:
+
+```powershell
+1..4 | ForEach-Object {
+  Start-Process powershell -ArgumentList "-NoExit","-Command","cd 'D:\Web Porto\signwaiters'; php artisan queue:work --queue=default --sleep=1 --tries=3 --timeout=1800"
+}
+```
+
+## Cara Penggunaan
+
+### User
+- Buka `/permohonan`.
+- Isi form dan upload PDF.
+- Simpan token yang dihasilkan.
+- Cek status di `/cek-token`.
+- Jika status `siap`, download dari tombol unduh.
+
+### Admin
+- Login di `/admin/login`.
+- Dashboard di `/admin/dashboard`.
+- Gunakan filter/pencarian/sort sesuai kebutuhan.
+- Proses tiap request dari tombol `Detail`.
+
+### Bulk Upload ZIP
+- Masuk halaman `/admin/bulk-upload`.
+- Upload ZIP berisi PDF (boleh nested ZIP).
+- Format file: `TOKEN_namafile.pdf`.
+- Sistem proses maksimal 100 file per batch.
+- Pantau progress live sampai `done/failed`.
+
+### Bulk Download ZIP
+- Dari dashboard, trigger bulk download sesuai filter aktif.
+- Proses berjalan via queue.
+- Pantau di `/admin/bulk-download?bulk_download_id=...`.
+- Saat selesai, ZIP auto terunduh.
+
+### Generate TXT
+- Dari dashboard admin, klik generate TXT.
+- File TXT berisi daftar nama file sesuai filter aktif.
+- Setiap baris bernomor (`1.`, `2.`, dst).
+
+## Endpoint Penting
+
+### Web
+- `GET /permohonan`
+- `POST /permohonan`
+- `GET /cek-token`
+- `POST /cek-token`
+- `GET /unduh/{token}`
+- `GET /admin/login`
+- `POST /admin/login`
+- `GET /admin/dashboard`
+- `GET|POST /admin/bulk-upload`
+- `GET|POST /admin/bulk-download`
+
+### API
+- `POST /api/request`
+- `POST /api/status`
+- `GET /api/download/{token}`
+- `POST /api/admin/login`
+
+## Deploy Production
+
+## 1. Server Requirement
+- Linux server (Ubuntu/Debian disarankan)
+- Nginx/Apache
+- PHP-FPM 8.2+
+- MySQL
+- Redis
+- MinIO (self-hosted) atau object storage S3-compatible
+- Supervisor/systemd untuk queue worker
+
+## 2. Langkah Deploy
+
+1. Upload source code ke server.
+2. Jalankan:
+
+```bash
+composer install --no-dev --optimize-autoloader
+npm install
+npm run build
+```
+
+3. Set `.env` production:
+- `APP_ENV=production`
+- `APP_DEBUG=false`
+- konfigurasi DB/Redis/MinIO yang valid
+
+4. Generate key + migrate + seed admin:
+
+```bash
+php artisan key:generate
+php artisan migrate --force
+php artisan db:seed --force
+```
+
+5. Optimasi Laravel:
+
+```bash
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+6. Jalankan queue worker via Supervisor (contoh command):
+
+```bash
+php artisan queue:work --queue=default --sleep=1 --tries=3 --timeout=1800
+```
+
+7. Setup scheduler (opsional jika nanti ada auto cleanup):
+
+```bash
+* * * * * cd /path/to/project && php artisan schedule:run >> /dev/null 2>&1
+```
+
+## 3. Checklist Production
+
+- Pastikan bucket MinIO sudah ada.
+- Pastikan kredensial MinIO benar.
+- Pastikan worker queue selalu running.
+- Pastikan `storage/` dan `bootstrap/cache/` writable.
+- Pastikan limit upload di PHP/Nginx cukup untuk ZIP.
+
+## Troubleshooting Cepat
+
+- Bulk tidak jalan: cek worker `queue:work`.
+- Upload ZIP gagal: cek `upload_max_filesize` dan `post_max_size`.
+- Error Redis connection refused: pastikan Redis service aktif.
+- File download not found: cek object path di DB dan bucket MinIO.
+- Progress mentok queued: cek tabel `jobs`/`failed_jobs` dan log `storage/logs/laravel.log`.

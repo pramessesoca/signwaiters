@@ -19,6 +19,12 @@ class AdminPanelController extends Controller
 {
     public function dashboard(Request $request)
     {
+        if (! $request->filled('tgl_dari')) {
+            $request->merge([
+                'tgl_dari' => now()->toDateString(),
+            ]);
+        }
+
         $validated = $this->validateDashboardFilter($request);
         $q = $this->buildFilteredQuery($validated);
         $q->orderBy($validated['sort'], $validated['dir']);
@@ -49,9 +55,9 @@ class AdminPanelController extends Controller
         $rows = $q->get(['token', 'nama', 'tim', 'file_req', 'file_tte']);
 
         $lines = [];
-        foreach ($rows as $row) {
+        foreach ($rows as $index => $row) {
             $namaFile = basename($row->file_tte ?: $row->file_req);
-            $lines[] = $namaFile;
+            $lines[] = ($index + 1).'. '.$namaFile;
         }
 
         $txt = implode(PHP_EOL, $lines);
