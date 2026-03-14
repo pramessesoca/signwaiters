@@ -24,7 +24,12 @@
             </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700">Tim Kerja</label>
-                <input class="w-full rounded-xl border border-slate-300 px-3 py-2 outline-none ring-0 focus:border-blue-500" type="text" name="tim" value="{{ old('tim') }}" required>
+                <select class="w-full rounded-xl border border-slate-300 px-3 py-2 outline-none ring-0 focus:border-blue-500" name="tim" required>
+                    <option value="">Pilih Tim</option>
+                    @foreach ($listTim as $tim)
+                        <option value="{{ $tim }}" @selected(old('tim') === $tim)>{{ $tim }}</option>
+                    @endforeach
+                </select>
                 @error('tim') <small class="mt-1 block text-sm text-red-600">{{ $message }}</small> @enderror
             </div>
             <div>
@@ -38,3 +43,5 @@
         </form>
     </div>
 @endsection
+
+

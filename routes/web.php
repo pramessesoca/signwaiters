@@ -23,5 +23,7 @@ Route::middleware('admin.web')->prefix('admin')->group(function () {
     Route::post('/requests/{tteRequest}/setuju', [AdminPanelController::class, 'setuju'])->name('admin.request.setuju');
     Route::post('/requests/{tteRequest}/tolak', [AdminPanelController::class, 'tolak'])->name('admin.request.tolak');
     Route::post('/requests/{tteRequest}/unggah-tte', [AdminPanelController::class, 'unggahTte'])->name('admin.request.unggah_tte');
+    Route::post('/requests/{tteRequest}/generate-token', [AdminPanelController::class, 'generateUlangToken'])->name('admin.request.generate_token');
+    Route::post('/requests/{tteRequest}/hapus', [AdminPanelController::class, 'hapus'])->name('admin.request.hapus');
     Route::post('/logout', [AdminSessionController::class, 'logout'])->name('admin.logout');
 });

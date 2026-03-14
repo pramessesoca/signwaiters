@@ -11,14 +11,16 @@ class UserPortalController extends Controller
 {
     public function formPermohonan()
     {
-        return view('user.request');
+        return view('user.request', [
+            'listTim' => TteRequest::listTim(),
+        ]);
     }
 
     public function simpanPermohonan(Request $request)
     {
         $data = $request->validate([
             'nama' => ['required', 'string', 'max:255'],
-            'tim' => ['required', 'string', 'max:255'],
+            'tim' => ['required', 'string', 'in:'.implode(',', TteRequest::listTim())],
             'file' => ['required', 'file', 'mimes:pdf', 'max:10240'],
         ]);
 

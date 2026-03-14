@@ -10,6 +10,18 @@ class TteRequest extends Model
 {
     use HasFactory;
 
+    public const LIST_TIM = [
+        'ITSA',
+        'Monitoring',
+        'Proteksi',
+        'Analisis Malware',
+        'Threat Hunting',
+        'Cyber Threat Intelligence',
+        'Digital Forensic',
+        'Incident Response',
+        'Infrastruktur',
+    ];
+
     public const STATUS_TUNGGU = 'tunggu';
     public const STATUS_SETUJU = 'setuju';
     public const STATUS_TOLAK = 'tolak';
@@ -44,5 +56,10 @@ class TteRequest extends Model
         } while (self::where('token', $token)->exists());
 
         return $token;
+    }
+
+    public static function listTim(): array
+    {
+        return self::LIST_TIM;
     }
 }

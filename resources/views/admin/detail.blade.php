@@ -36,6 +36,11 @@
                 <button class="rounded-xl bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700" type="submit">Setujui</button>
             </form>
 
+            <form action="{{ route('admin.request.generate_token', $item) }}" method="POST">
+                @csrf
+                <button class="rounded-xl bg-amber-500 px-4 py-2 font-medium text-white hover:bg-amber-600" type="submit">Generate Ulang Token</button>
+            </form>
+
             <form action="{{ route('admin.request.tolak', $item) }}" method="POST" class="flex-1">
                 @csrf
                 <label class="mb-1 block text-sm font-medium text-slate-700">Catatan Penolakan</label>
@@ -60,3 +65,5 @@
         </form>
     </div>
 @endsection
+
+

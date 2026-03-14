@@ -14,7 +14,7 @@ class TteRequestController extends Controller
     {
         $data = $request->validate([
             'nama' => ['required', 'string', 'max:255'],
-            'tim' => ['required', 'string', 'max:255'],
+            'tim' => ['required', 'string', 'in:'.implode(',', TteRequest::listTim())],
             'file' => ['required', 'file', 'mimes:pdf', 'max:10240'],
         ]);
 
