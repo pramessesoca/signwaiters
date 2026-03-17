@@ -2,13 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\ProcessBulkZipUpload;
 use App\Jobs\ProcessBulkDownloadZip;
-use App\Models\BulkDownload;
-use App\Models\BulkUpload;
+use App\Jobs\ProcessBulkZipUpload;
 use App\Models\TteRequest;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use App\Support\BulkRedisState;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
@@ -81,57 +78,64 @@ class AdminPanelController extends Controller
         ]);
 
         $storedPath = $data['zip_file']->store('bulk-zips', 'local');
+        $bulkId = (string) Str::uuid();
 
-        $bulk = BulkUpload::query()->create([
+        BulkRedisState::setUpload($bulkId, [
+            'id' => $bulkId,
+            'type' => 'upload',
             'status' => 'queued',
             'total_file' => 0,
             'processed' => 0,
             'success' => 0,
             'failed' => 0,
-            'error_log_json' => [
-                'summary' => [
-                    'token_tidak_ditemukan' => 0,
-                    'format_invalid' => 0,
-                ],
-                'items' => [],
+            'summary' => [
+                'token_tidak_ditemukan' => 0,
+                'format_invalid' => 0,
+                'melewati_batas_100' => 0,
             ],
+            'errors' => [],
+            'results' => [],
+            'started_at' => null,
+            'finished_at' => null,
         ]);
 
-        ProcessBulkZipUpload::dispatch($bulk->id, $storedPath);
+        ProcessBulkZipUpload::dispatch($bulkId, $storedPath);
 
         return redirect()
-            ->route('admin.bulk_upload.form', ['bulk_upload_id' => $bulk->id])
+            ->route('admin.bulk_upload.form', ['bulk_upload_id' => $bulkId])
             ->with('sukses', 'ZIP berhasil diupload. Proses berjalan di background.');
     }
 
-    public function bulkUploadStatus(BulkUpload $bulkUpload)
+    public function bulkUploadStatus(string $bulkUpload)
     {
-        $summary = $bulkUpload->error_log_json['summary'] ?? [
-            'token_tidak_ditemukan' => 0,
-            'format_invalid' => 0,
-            'melewati_batas_100' => 0,
-        ];
-        $items = $bulkUpload->error_log_json['items'] ?? [];
+        $state = BulkRedisState::getUpload($bulkUpload);
+        if (! $state) {
+            return response()->json([
+                'message' => 'Proses bulk upload tidak ditemukan atau sudah kedaluwarsa.',
+            ], 404);
+        }
 
         return response()->json([
-            'id' => $bulkUpload->id,
-            'status' => $bulkUpload->status,
-            'total_file' => $bulkUpload->total_file,
-            'processed' => $bulkUpload->processed,
-            'success' => $bulkUpload->success,
-            'failed' => $bulkUpload->failed,
-            'summary' => $summary,
-            'errors' => $items,
-            'started_at' => $bulkUpload->started_at,
-            'finished_at' => $bulkUpload->finished_at,
+            'id' => $state['id'],
+            'status' => $state['status'] ?? 'queued',
+            'total_file' => (int) ($state['total_file'] ?? 0),
+            'processed' => (int) ($state['processed'] ?? 0),
+            'success' => (int) ($state['success'] ?? 0),
+            'failed' => (int) ($state['failed'] ?? 0),
+            'summary' => $state['summary'] ?? [
+                'token_tidak_ditemukan' => 0,
+                'format_invalid' => 0,
+                'melewati_batas_100' => 0,
+            ],
+            'errors' => $state['errors'] ?? [],
+            'started_at' => $state['started_at'] ?? null,
+            'finished_at' => $state['finished_at'] ?? null,
         ]);
     }
 
     public function bulkUploadClear()
     {
-        BulkUpload::query()
-            ->whereIn('status', ['done', 'failed'])
-            ->delete();
+        BulkRedisState::clearUploadDoneFailed();
 
         return redirect()
             ->route('admin.bulk_upload.form')
@@ -146,58 +150,77 @@ class AdminPanelController extends Controller
     public function bulkDownloadStore(Request $request)
     {
         $validated = $this->validateDashboardFilter($request);
+        $bulkId = (string) Str::uuid();
 
-        $bulk = BulkDownload::query()->create([
+        BulkRedisState::setDownload($bulkId, [
+            'id' => $bulkId,
+            'type' => 'download',
             'status' => 'queued',
             'total_file' => 0,
             'processed' => 0,
             'success' => 0,
             'failed' => 0,
-            'error_log_json' => [],
-            'result_log_json' => [],
+            'summary' => [],
+            'errors' => [],
+            'results' => [],
+            'zip_path' => null,
+            'started_at' => null,
+            'finished_at' => null,
         ]);
 
-        ProcessBulkDownloadZip::dispatch($bulk->id, $validated);
+        ProcessBulkDownloadZip::dispatch($bulkId, $validated);
 
         return redirect()
-            ->route('admin.bulk_download.form', ['bulk_download_id' => $bulk->id])
+            ->route('admin.bulk_download.form', ['bulk_download_id' => $bulkId])
             ->with('sukses', 'Bulk download dimulai di background.');
     }
 
-    public function bulkDownloadStatus(BulkDownload $bulkDownload)
+    public function bulkDownloadStatus(string $bulkDownload)
     {
+        $state = BulkRedisState::getDownload($bulkDownload);
+        if (! $state) {
+            return response()->json([
+                'message' => 'Proses bulk download tidak ditemukan atau sudah kedaluwarsa.',
+            ], 404);
+        }
+
         return response()->json([
-            'id' => $bulkDownload->id,
-            'status' => $bulkDownload->status,
-            'total_file' => $bulkDownload->total_file,
-            'processed' => $bulkDownload->processed,
-            'success' => $bulkDownload->success,
-            'failed' => $bulkDownload->failed,
-            'errors' => $bulkDownload->error_log_json ?? [],
-            'results' => $bulkDownload->result_log_json ?? [],
-            'started_at' => $bulkDownload->started_at,
-            'finished_at' => $bulkDownload->finished_at,
-            'has_file' => ! empty($bulkDownload->zip_path),
+            'id' => $state['id'],
+            'status' => $state['status'] ?? 'queued',
+            'total_file' => (int) ($state['total_file'] ?? 0),
+            'processed' => (int) ($state['processed'] ?? 0),
+            'success' => (int) ($state['success'] ?? 0),
+            'failed' => (int) ($state['failed'] ?? 0),
+            'errors' => $state['errors'] ?? [],
+            'results' => $state['results'] ?? [],
+            'started_at' => $state['started_at'] ?? null,
+            'finished_at' => $state['finished_at'] ?? null,
+            'has_file' => ! empty($state['zip_path'] ?? null),
         ]);
     }
 
-    public function bulkDownloadFile(BulkDownload $bulkDownload)
+    public function bulkDownloadFile(string $bulkDownload)
     {
-        if ($bulkDownload->status !== 'done' || ! $bulkDownload->zip_path) {
+        $state = BulkRedisState::getDownload($bulkDownload);
+        if (! $state) {
+            abort(404, 'Proses bulk download tidak ditemukan atau sudah kedaluwarsa.');
+        }
+
+        $zipPath = (string) ($state['zip_path'] ?? '');
+        if (($state['status'] ?? '') !== 'done' || $zipPath === '') {
             abort(404, 'File ZIP belum siap.');
         }
 
-        if (Storage::disk('local')->exists($bulkDownload->zip_path)) {
+        if (Storage::disk('local')->exists($zipPath)) {
             return Storage::disk('local')->download(
-                $bulkDownload->zip_path,
-                'bulk-download-'.$bulkDownload->id.'.zip'
+                $zipPath,
+                'bulk-download-'.$bulkDownload.'.zip'
             );
         }
 
-        // Backward compatibility for ZIP files created before local disk path fix.
-        $legacyPath = storage_path('app'.DIRECTORY_SEPARATOR.$bulkDownload->zip_path);
+        $legacyPath = storage_path('app'.DIRECTORY_SEPARATOR.$zipPath);
         if (is_file($legacyPath)) {
-            return response()->download($legacyPath, 'bulk-download-'.$bulkDownload->id.'.zip');
+            return response()->download($legacyPath, 'bulk-download-'.$bulkDownload.'.zip');
         }
 
         abort(404, 'File ZIP tidak ditemukan.');
@@ -205,19 +228,19 @@ class AdminPanelController extends Controller
 
     public function bulkDownloadClear()
     {
-        $rows = BulkDownload::query()
-            ->whereIn('status', ['done', 'failed'])
-            ->get();
+        $cleared = BulkRedisState::clearDownloadDoneFailed();
 
-        foreach ($rows as $row) {
-            if ($row->zip_path && Storage::disk('local')->exists($row->zip_path)) {
-                Storage::disk('local')->delete($row->zip_path);
+        foreach ($cleared as $state) {
+            $zipPath = (string) ($state['zip_path'] ?? '');
+            if ($zipPath !== '' && Storage::disk('local')->exists($zipPath)) {
+                Storage::disk('local')->delete($zipPath);
+            }
+
+            $legacyPath = storage_path('app'.DIRECTORY_SEPARATOR.$zipPath);
+            if ($zipPath !== '' && is_file($legacyPath)) {
+                @unlink($legacyPath);
             }
         }
-
-        BulkDownload::query()
-            ->whereIn('status', ['done', 'failed'])
-            ->delete();
 
         return redirect()
             ->route('admin.bulk_download.form')
@@ -226,43 +249,26 @@ class AdminPanelController extends Controller
 
     public function bulkClearAll()
     {
-        $allDownloads = BulkDownload::query()->get();
+        $allDownloads = BulkRedisState::clearAllDownload();
+        BulkRedisState::clearAllUpload();
 
-        foreach ($allDownloads as $row) {
-            if ($row->zip_path && Storage::disk('local')->exists($row->zip_path)) {
-                Storage::disk('local')->delete($row->zip_path);
+        foreach ($allDownloads as $state) {
+            $zipPath = (string) ($state['zip_path'] ?? '');
+            if ($zipPath !== '' && Storage::disk('local')->exists($zipPath)) {
+                Storage::disk('local')->delete($zipPath);
             }
 
-            $legacyPath = storage_path('app'.DIRECTORY_SEPARATOR.$row->zip_path);
-            if ($row->zip_path && is_file($legacyPath)) {
+            $legacyPath = storage_path('app'.DIRECTORY_SEPARATOR.$zipPath);
+            if ($zipPath !== '' && is_file($legacyPath)) {
                 @unlink($legacyPath);
             }
         }
 
-        // Hard clear queue entries related to bulk jobs.
-        if (Schema::hasTable('jobs')) {
-            DB::table('jobs')
-                ->where('payload', 'like', '%ProcessBulkZipUpload%')
-                ->orWhere('payload', 'like', '%ProcessBulkDownloadZip%')
-                ->delete();
-        }
-
-        if (Schema::hasTable('failed_jobs')) {
-            DB::table('failed_jobs')
-                ->where('payload', 'like', '%ProcessBulkZipUpload%')
-                ->orWhere('payload', 'like', '%ProcessBulkDownloadZip%')
-                ->delete();
-        }
-
-        BulkDownload::query()->delete();
-        BulkUpload::query()->delete();
-
-        // Remove leftover temporary/bulk files if any.
         Storage::disk('local')->deleteDirectory('bulk-zips');
         Storage::disk('local')->deleteDirectory('bulk-download-zips');
         Storage::disk('local')->deleteDirectory('tmp');
 
-        return back()->with('sukses', 'Semua proses bulk (upload/download), queue terkait, dan file sementara berhasil dibersihkan.');
+        return back()->with('sukses', 'Semua proses bulk (upload/download) dan file sementara berhasil dibersihkan.');
     }
 
     public function detail(TteRequest $tteRequest)
@@ -446,4 +452,3 @@ class AdminPanelController extends Controller
         return $newPath;
     }
 }
-

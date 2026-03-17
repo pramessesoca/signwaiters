@@ -2,8 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Models\BulkUpload;
 use App\Models\TteRequest;
+use App\Support\BulkRedisState;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -24,27 +24,30 @@ class ProcessBulkZipUpload implements ShouldQueue
     private const MAX_FILES = 100;
 
     public function __construct(
-        public int $bulkUploadId,
+        public string $bulkUploadId,
         public string $zipPath
     ) {}
 
     public function handle(): void
     {
-        $bulk = BulkUpload::query()->findOrFail($this->bulkUploadId);
-        $bulk->update([
-            'status' => 'running',
-            'started_at' => now(),
-            'error_log_json' => [
-                'summary' => [
-                    'token_tidak_ditemukan' => 0,
-                    'format_invalid' => 0,
-                    'melewati_batas_100' => 0,
-                ],
-                'items' => [],
-            ],
-        ]);
+        $this->mutateState(function (array &$state): void {
+            $state['status'] = 'running';
+            $state['started_at'] = now()->toISOString();
+            $state['finished_at'] = null;
+            $state['total_file'] = 0;
+            $state['processed'] = 0;
+            $state['success'] = 0;
+            $state['failed'] = 0;
+            $state['summary'] = [
+                'token_tidak_ditemukan' => 0,
+                'format_invalid' => 0,
+                'melewati_batas_100' => 0,
+            ];
+            $state['errors'] = [];
+            $state['results'] = [];
+        });
 
-        $tmpRoot = storage_path('app/tmp/bulk_upload_'.$bulk->id.'_'.Str::random(8));
+        $tmpRoot = storage_path('app/tmp/bulk_upload_'.$this->bulkUploadId.'_'.Str::random(8));
         $zipFile = Storage::disk('local')->path($this->zipPath);
 
         try {
@@ -54,44 +57,38 @@ class ProcessBulkZipUpload implements ShouldQueue
 
             $pdfFiles = $this->collectPdfFilesFromZip($zipFile, $tmpRoot);
             $selectedPdfFiles = array_slice($pdfFiles, 0, self::MAX_FILES);
-            $bulk->update(['total_file' => count($selectedPdfFiles)]);
+
+            $this->mutateState(function (array &$state) use ($selectedPdfFiles): void {
+                $state['total_file'] = count($selectedPdfFiles);
+            });
 
             if (count($pdfFiles) > self::MAX_FILES) {
-                $log = $bulk->error_log_json ?? ['summary' => [], 'items' => []];
-                $summary = $log['summary'] ?? [];
-                $items = $log['items'] ?? [];
-                $summary['melewati_batas_100'] = count($pdfFiles) - self::MAX_FILES;
-                $items[] = [
-                    'file' => null,
-                    'reason' => 'Sebagian file dilewati karena batas maksimal 100 file per proses.',
-                ];
-                $log['summary'] = $summary;
-                $log['items'] = $items;
-                $bulk->update(['error_log_json' => $log]);
+                $this->mutateState(function (array &$state) use ($pdfFiles): void {
+                    $state['summary']['melewati_batas_100'] = count($pdfFiles) - self::MAX_FILES;
+                    $state['errors'][] = [
+                        'file' => null,
+                        'reason' => 'Sebagian file dilewati karena batas maksimal 100 file per proses.',
+                    ];
+                });
             }
 
             foreach ($selectedPdfFiles as $pdfPath) {
-                $this->processOnePdf($bulk, $pdfPath);
+                $this->processOnePdf($pdfPath);
             }
 
-            $bulk->update([
-                'status' => 'done',
-                'finished_at' => now(),
-            ]);
+            $this->mutateState(function (array &$state): void {
+                $state['status'] = 'done';
+                $state['finished_at'] = now()->toISOString();
+            }, BulkRedisState::FINAL_TTL_SECONDS);
         } catch (Throwable $e) {
-            $log = $bulk->error_log_json ?? ['summary' => [], 'items' => []];
-            $items = $log['items'] ?? [];
-            $items[] = [
-                'file' => null,
-                'reason' => 'job_error: '.$e->getMessage(),
-            ];
-            $log['items'] = $items;
-
-            $bulk->update([
-                'status' => 'failed',
-                'finished_at' => now(),
-                'error_log_json' => $log,
-            ]);
+            $this->mutateState(function (array &$state) use ($e): void {
+                $state['status'] = 'failed';
+                $state['finished_at'] = now()->toISOString();
+                $state['errors'][] = [
+                    'file' => null,
+                    'reason' => 'job_error: '.$e->getMessage(),
+                ];
+            }, BulkRedisState::FINAL_TTL_SECONDS);
         } finally {
             $this->deleteDir($tmpRoot);
             if (Storage::disk('local')->exists($this->zipPath)) {
@@ -100,20 +97,21 @@ class ProcessBulkZipUpload implements ShouldQueue
         }
     }
 
-    private function processOnePdf(BulkUpload $bulk, string $pdfPath): void
+    private function processOnePdf(string $pdfPath): void
     {
         $filename = basename($pdfPath);
         $nameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
 
         if (! preg_match('/^([A-Za-z0-9]{8})_(.+)$/', $nameWithoutExt, $m)) {
-            $this->markFailed($bulk, $filename, 'format_invalid');
+            $this->markFailed($filename, 'format_invalid');
             return;
         }
 
         $token = Str::upper($m[1]);
         $request = TteRequest::query()->where('token', $token)->first();
+
         if (! $request) {
-            $this->markFailed($bulk, $filename, 'token_tidak_ditemukan');
+            $this->markFailed($filename, 'token_tidak_ditemukan');
             return;
         }
 
@@ -132,28 +130,53 @@ class ProcessBulkZipUpload implements ShouldQueue
             'tgl_setuju' => $request->tgl_setuju ?? now(),
         ]);
 
-        $bulk->increment('processed');
-        $bulk->increment('success');
+        $this->mutateState(function (array &$state) use ($filename, $token): void {
+            $state['processed'] = (int) ($state['processed'] ?? 0) + 1;
+            $state['success'] = (int) ($state['success'] ?? 0) + 1;
+            $state['results'][] = [
+                'file' => $filename,
+                'token' => $token,
+                'status' => 'uploaded',
+            ];
+        });
     }
 
-    private function markFailed(BulkUpload $bulk, string $filename, string $reason): void
+    private function markFailed(string $filename, string $reason): void
     {
-        $log = $bulk->error_log_json ?? ['summary' => [], 'items' => []];
-        $summary = $log['summary'] ?? [];
-        $items = $log['items'] ?? [];
+        $this->mutateState(function (array &$state) use ($filename, $reason): void {
+            $state['summary'][$reason] = (int) ($state['summary'][$reason] ?? 0) + 1;
+            $state['errors'][] = [
+                'file' => $filename,
+                'reason' => $reason,
+            ];
+            $state['processed'] = (int) ($state['processed'] ?? 0) + 1;
+            $state['failed'] = (int) ($state['failed'] ?? 0) + 1;
+        });
+    }
 
-        $summary[$reason] = ($summary[$reason] ?? 0) + 1;
-        $items[] = [
-            'file' => $filename,
-            'reason' => $reason,
+    private function mutateState(callable $mutator, ?int $ttlSeconds = null): void
+    {
+        $state = BulkRedisState::getUpload($this->bulkUploadId) ?? [
+            'id' => $this->bulkUploadId,
+            'type' => 'upload',
+            'status' => 'queued',
+            'total_file' => 0,
+            'processed' => 0,
+            'success' => 0,
+            'failed' => 0,
+            'summary' => [
+                'token_tidak_ditemukan' => 0,
+                'format_invalid' => 0,
+                'melewati_batas_100' => 0,
+            ],
+            'errors' => [],
+            'results' => [],
+            'started_at' => null,
+            'finished_at' => null,
         ];
 
-        $log['summary'] = $summary;
-        $log['items'] = $items;
-
-        $bulk->update(['error_log_json' => $log]);
-        $bulk->increment('processed');
-        $bulk->increment('failed');
+        $mutator($state);
+        BulkRedisState::setUpload($this->bulkUploadId, $state, $ttlSeconds);
     }
 
     /**

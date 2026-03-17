@@ -40,7 +40,7 @@ Penyimpanan file menggunakan MinIO (S3-compatible), cache/session menggunakan Re
 - Database: MySQL
 - File storage: MinIO via disk `s3`
 - Cache/Session: Redis (Predis)
-- Queue: `database` driver + `php artisan queue:work`
+- Queue: `redis` driver + `php artisan queue:work redis`
 - Frontend: Blade + Tailwind
 
 ## Struktur Alur Sistem
@@ -120,7 +120,8 @@ DB_DATABASE=signwaiters
 DB_USERNAME=root
 DB_PASSWORD=
 
-QUEUE_CONNECTION=database
+QUEUE_CONNECTION=redis
+QUEUE_FAILED_DRIVER=null
 CACHE_STORE=redis
 SESSION_DRIVER=redis
 REDIS_CLIENT=predis
@@ -169,7 +170,7 @@ php artisan serve
 9. Jalankan worker queue (wajib untuk proses bulk).
 
 ```bash
-php artisan queue:work --queue=default --sleep=1 --tries=3 --timeout=1800
+php artisan queue:work redis --queue=default --sleep=1 --tries=3 --timeout=1800
 ```
 
 ## Menjalankan Banyak Worker (Windows PowerShell)
@@ -178,7 +179,7 @@ Contoh 4 worker sekaligus:
 
 ```powershell
 1..4 | ForEach-Object {
-  Start-Process powershell -ArgumentList "-NoExit","-Command","cd 'D:\Web Porto\signwaiters'; php artisan queue:work --queue=default --sleep=1 --tries=3 --timeout=1800"
+  Start-Process powershell -ArgumentList "-NoExit","-Command","cd 'D:\Web Porto\signwaiters'; php artisan queue:work redis --queue=default --sleep=1 --tries=3 --timeout=1800"
 }
 ```
 
@@ -281,7 +282,7 @@ php artisan view:cache
 6. Jalankan queue worker via Supervisor (contoh command):
 
 ```bash
-php artisan queue:work --queue=default --sleep=1 --tries=3 --timeout=1800
+php artisan queue:work redis --queue=default --sleep=1 --tries=3 --timeout=1800
 ```
 
 7. Setup scheduler (opsional jika nanti ada auto cleanup):

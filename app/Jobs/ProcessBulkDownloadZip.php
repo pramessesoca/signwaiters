@@ -2,8 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Models\BulkDownload;
 use App\Models\TteRequest;
+use App\Support\BulkRedisState;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -22,30 +22,40 @@ class ProcessBulkDownloadZip implements ShouldQueue
     private const MAX_FILES = 100;
 
     public function __construct(
-        public int $bulkDownloadId,
+        public string $bulkDownloadId,
         public array $filter
     ) {}
 
     public function handle(): void
     {
-        $bulk = BulkDownload::query()->findOrFail($this->bulkDownloadId);
-        $bulk->update([
-            'status' => 'running',
-            'started_at' => now(),
-            'error_log_json' => [],
-            'result_log_json' => [],
-        ]);
+        $this->mutateState(function (array &$state): void {
+            $state['status'] = 'running';
+            $state['started_at'] = now()->toISOString();
+            $state['finished_at'] = null;
+            $state['total_file'] = 0;
+            $state['processed'] = 0;
+            $state['success'] = 0;
+            $state['failed'] = 0;
+            $state['summary'] = [];
+            $state['errors'] = [];
+            $state['results'] = [];
+            $state['zip_path'] = null;
+        });
 
         $query = $this->buildFilteredQuery($this->filter);
         $query->orderBy($this->filter['sort'] ?? 'created_at', $this->filter['dir'] ?? 'desc');
         $rows = $query->limit(self::MAX_FILES)->get();
-        $bulk->update(['total_file' => $rows->count()]);
+
+        $this->mutateState(function (array &$state) use ($rows): void {
+            $state['total_file'] = $rows->count();
+        });
 
         $zipDir = Storage::disk('local')->path('bulk-download-zips');
         if (! is_dir($zipDir)) {
             mkdir($zipDir, 0777, true);
         }
-        $zipName = 'bulk_download_'.$bulk->id.'_'.now()->format('Ymd_His').'.zip';
+
+        $zipName = 'bulk_download_'.$this->bulkDownloadId.'_'.now()->format('Ymd_His').'.zip';
         $zipFullPath = $zipDir.DIRECTORY_SEPARATOR.$zipName;
 
         $zip = new ZipArchive();
@@ -54,21 +64,25 @@ class ProcessBulkDownloadZip implements ShouldQueue
         }
 
         $usedNames = [];
-        $resultLog = [];
         $errorLog = [];
+        $resultLog = [];
 
         try {
             foreach ($rows as $row) {
                 $sourcePath = $row->file_req;
                 if (! $sourcePath || ! Storage::disk('s3')->exists($sourcePath)) {
-                    $errorLog[] = [
+                    $error = [
                         'token' => $row->token,
                         'file' => $sourcePath,
                         'reason' => 'file_tidak_ditemukan',
                     ];
-                    $bulk->increment('processed');
-                    $bulk->increment('failed');
-                    $bulk->update(['error_log_json' => $errorLog]);
+                    $errorLog[] = $error;
+
+                    $this->mutateState(function (array &$state) use ($error, $errorLog): void {
+                        $state['processed'] = (int) ($state['processed'] ?? 0) + 1;
+                        $state['failed'] = (int) ($state['failed'] ?? 0) + 1;
+                        $state['errors'] = $errorLog;
+                    });
                     continue;
                 }
 
@@ -77,62 +91,98 @@ class ProcessBulkDownloadZip implements ShouldQueue
 
                 $stream = Storage::disk('s3')->readStream($sourcePath);
                 if (! is_resource($stream)) {
-                    $errorLog[] = [
+                    $error = [
                         'token' => $row->token,
                         'file' => $sourcePath,
                         'reason' => 'gagal_baca_stream',
                     ];
-                    $bulk->increment('processed');
-                    $bulk->increment('failed');
-                    $bulk->update(['error_log_json' => $errorLog]);
+                    $errorLog[] = $error;
+
+                    $this->mutateState(function (array &$state) use ($errorLog): void {
+                        $state['processed'] = (int) ($state['processed'] ?? 0) + 1;
+                        $state['failed'] = (int) ($state['failed'] ?? 0) + 1;
+                        $state['errors'] = $errorLog;
+                    });
                     continue;
                 }
 
                 $content = stream_get_contents($stream);
                 fclose($stream);
+
                 if ($content === false) {
-                    $errorLog[] = [
+                    $error = [
                         'token' => $row->token,
                         'file' => $sourcePath,
                         'reason' => 'gagal_baca_konten',
                     ];
-                    $bulk->increment('processed');
-                    $bulk->increment('failed');
-                    $bulk->update(['error_log_json' => $errorLog]);
+                    $errorLog[] = $error;
+
+                    $this->mutateState(function (array &$state) use ($errorLog): void {
+                        $state['processed'] = (int) ($state['processed'] ?? 0) + 1;
+                        $state['failed'] = (int) ($state['failed'] ?? 0) + 1;
+                        $state['errors'] = $errorLog;
+                    });
                     continue;
                 }
 
                 $zip->addFromString($filenameInZip, $content);
 
-                $resultLog[] = [
+                $result = [
                     'token' => $row->token,
                     'source' => $sourcePath,
                     'zip_name' => $filenameInZip,
                 ];
-                $bulk->increment('processed');
-                $bulk->increment('success');
-                $bulk->update(['result_log_json' => $resultLog]);
+                $resultLog[] = $result;
+
+                $this->mutateState(function (array &$state) use ($resultLog): void {
+                    $state['processed'] = (int) ($state['processed'] ?? 0) + 1;
+                    $state['success'] = (int) ($state['success'] ?? 0) + 1;
+                    $state['results'] = $resultLog;
+                });
             }
 
             $zip->close();
 
-            $bulk->update([
-                'status' => 'done',
-                'zip_path' => 'bulk-download-zips/'.$zipName,
-                'finished_at' => now(),
-                'error_log_json' => $errorLog,
-                'result_log_json' => $resultLog,
-            ]);
+            $this->mutateState(function (array &$state) use ($zipName, $errorLog, $resultLog): void {
+                $state['status'] = 'done';
+                $state['zip_path'] = 'bulk-download-zips/'.$zipName;
+                $state['finished_at'] = now()->toISOString();
+                $state['errors'] = $errorLog;
+                $state['results'] = $resultLog;
+            }, BulkRedisState::FINAL_TTL_SECONDS);
         } catch (Throwable $e) {
             $zip->close();
             $errorLog[] = ['reason' => 'job_error: '.$e->getMessage()];
-            $bulk->update([
-                'status' => 'failed',
-                'finished_at' => now(),
-                'error_log_json' => $errorLog,
-                'result_log_json' => $resultLog,
-            ]);
+
+            $this->mutateState(function (array &$state) use ($errorLog, $resultLog): void {
+                $state['status'] = 'failed';
+                $state['finished_at'] = now()->toISOString();
+                $state['errors'] = $errorLog;
+                $state['results'] = $resultLog;
+            }, BulkRedisState::FINAL_TTL_SECONDS);
         }
+    }
+
+    private function mutateState(callable $mutator, ?int $ttlSeconds = null): void
+    {
+        $state = BulkRedisState::getDownload($this->bulkDownloadId) ?? [
+            'id' => $this->bulkDownloadId,
+            'type' => 'download',
+            'status' => 'queued',
+            'total_file' => 0,
+            'processed' => 0,
+            'success' => 0,
+            'failed' => 0,
+            'summary' => [],
+            'errors' => [],
+            'results' => [],
+            'zip_path' => null,
+            'started_at' => null,
+            'finished_at' => null,
+        ];
+
+        $mutator($state);
+        BulkRedisState::setDownload($this->bulkDownloadId, $state, $ttlSeconds);
     }
 
     private function buildFilteredQuery(array $filter)
