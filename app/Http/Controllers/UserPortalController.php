@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\TteRequest;
+use App\Support\ZipTokenNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -22,6 +23,7 @@ class UserPortalController extends Controller
             'nama' => ['required', 'string', 'max:255'],
             'tim' => ['required', 'string', 'in:'.implode(',', TteRequest::listTim())],
             'file_zip' => ['required', 'file', 'mimes:pdf,zip', 'max:102400'],
+            'upload_kind' => ['nullable', 'in:single_pdf,multi_pdf,zip_direct'],
         ]);
 
         $token = TteRequest::buatTokenUnik();
@@ -36,7 +38,18 @@ class UserPortalController extends Controller
                 ->withInput();
         }
         $namaFile = $token.'_'.Str::slug($baseName).'.'.$ext;
-        $path = $file->storeAs("request/{$tanggal}", $namaFile, 's3');
+        if ($ext === 'zip' && ($data['upload_kind'] ?? '') === 'multi_pdf') {
+            $normalizedZipPath = ZipTokenNormalizer::normalizeWithToken($file->getRealPath(), $token, 'zip_req_web');
+            $stream = fopen($normalizedZipPath, 'rb');
+            Storage::disk('s3')->put("request/{$tanggal}/{$namaFile}", $stream);
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+            @unlink($normalizedZipPath);
+            $path = "request/{$tanggal}/{$namaFile}";
+        } else {
+            $path = $file->storeAs("request/{$tanggal}", $namaFile, 's3');
+        }
 
         TteRequest::query()->create([
             'nama' => $data['nama'],

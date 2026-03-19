@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\TteRequest;
+use App\Support\ZipTokenNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
@@ -16,6 +17,7 @@ class TteRequestController extends Controller
             'nama' => ['required', 'string', 'max:255'],
             'tim' => ['required', 'string', 'in:'.implode(',', TteRequest::listTim())],
             'file_zip' => ['required', 'file', 'mimes:pdf,zip', 'max:102400'],
+            'upload_kind' => ['nullable', 'in:single_pdf,multi_pdf,zip_direct'],
         ]);
 
         $token = TteRequest::buatTokenUnik();
@@ -28,7 +30,20 @@ class TteRequestController extends Controller
             return response()->json(['pesan' => 'Ukuran file PDF maksimal 10MB.'], 422);
         }
         $namaFile = $token.'_'.Str::slug($baseName);
-        $path = $file->storeAs("request/{$today}", $namaFile.'.'.$ext, 's3');
+        $targetFilename = $namaFile.'.'.$ext;
+
+        if ($ext === 'zip' && ($data['upload_kind'] ?? '') === 'multi_pdf') {
+            $normalizedZipPath = ZipTokenNormalizer::normalizeWithToken($file->getRealPath(), $token, 'zip_req_api');
+            $stream = fopen($normalizedZipPath, 'rb');
+            Storage::disk('s3')->put("request/{$today}/{$targetFilename}", $stream);
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+            @unlink($normalizedZipPath);
+            $path = "request/{$today}/{$targetFilename}";
+        } else {
+            $path = $file->storeAs("request/{$today}", $targetFilename, 's3');
+        }
 
         $permohonan = TteRequest::create([
             'nama' => $data['nama'],

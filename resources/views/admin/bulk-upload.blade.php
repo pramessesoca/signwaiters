@@ -5,7 +5,7 @@
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h2 class="text-xl font-bold text-slate-900">Bulk Upload ZIP TTE</h2>
-                <p class="text-sm text-slate-600">Upload ZIP (boleh berisi ZIP + PDF). Format file PDF: <code>TOKEN_namafile.pdf</code>. Maksimal 100 file PDF diproses per batch.</p>
+                <p class="text-sm text-slate-600">Upload ZIP berisi file <code>.pdf</code> dan/atau <code>.zip</code> dengan format nama <code>TOKEN_namafile.ext</code>. ZIP di dalam ZIP tidak diekstrak, tetapi diupload langsung sesuai token. Maksimal 100 file diproses per batch.</p>
             </div>
             <div class="flex gap-2">
                 <form action="{{ route('admin.bulk_upload.clear') }}" method="POST" onsubmit="return confirm('Hapus semua riwayat bulk upload selesai?')">
@@ -133,4 +133,3 @@
         </script>
     @endif
 @endsection
-

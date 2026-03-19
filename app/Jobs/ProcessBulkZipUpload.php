@@ -55,16 +55,16 @@ class ProcessBulkZipUpload implements ShouldQueue
                 mkdir($tmpRoot, 0777, true);
             }
 
-            $pdfFiles = $this->collectPdfFilesFromZip($zipFile, $tmpRoot);
-            $selectedPdfFiles = array_slice($pdfFiles, 0, self::MAX_FILES);
+            $uploadableFiles = $this->collectUploadableFilesFromZip($zipFile, $tmpRoot);
+            $selectedFiles = array_slice($uploadableFiles, 0, self::MAX_FILES);
 
-            $this->mutateState(function (array &$state) use ($selectedPdfFiles): void {
-                $state['total_file'] = count($selectedPdfFiles);
+            $this->mutateState(function (array &$state) use ($selectedFiles): void {
+                $state['total_file'] = count($selectedFiles);
             });
 
-            if (count($pdfFiles) > self::MAX_FILES) {
-                $this->mutateState(function (array &$state) use ($pdfFiles): void {
-                    $state['summary']['melewati_batas_100'] = count($pdfFiles) - self::MAX_FILES;
+            if (count($uploadableFiles) > self::MAX_FILES) {
+                $this->mutateState(function (array &$state) use ($uploadableFiles): void {
+                    $state['summary']['melewati_batas_100'] = count($uploadableFiles) - self::MAX_FILES;
                     $state['errors'][] = [
                         'file' => null,
                         'reason' => 'Sebagian file dilewati karena batas maksimal 100 file per proses.',
@@ -72,8 +72,8 @@ class ProcessBulkZipUpload implements ShouldQueue
                 });
             }
 
-            foreach ($selectedPdfFiles as $pdfPath) {
-                $this->processOnePdf($pdfPath);
+            foreach ($selectedFiles as $filePath) {
+                $this->processOneFile($filePath);
             }
 
             $this->mutateState(function (array &$state): void {
@@ -97,10 +97,16 @@ class ProcessBulkZipUpload implements ShouldQueue
         }
     }
 
-    private function processOnePdf(string $pdfPath): void
+    private function processOneFile(string $filePath): void
     {
-        $filename = basename($pdfPath);
+        $filename = basename($filePath);
         $nameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
+        $ext = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
+
+        if (! in_array($ext, ['pdf', 'zip'], true)) {
+            $this->markFailed($filename, 'format_invalid');
+            return;
+        }
 
         if (! preg_match('/^([A-Za-z0-9]{8})_(.+)$/', $nameWithoutExt, $m)) {
             $this->markFailed($filename, 'format_invalid');
@@ -116,9 +122,9 @@ class ProcessBulkZipUpload implements ShouldQueue
         }
 
         $safeName = Str::slug($nameWithoutExt);
-        $path = 'tte/'.Carbon::now()->format('Y/m/d').'/'.$token.'_'.$safeName.'.pdf';
+        $path = 'tte/'.Carbon::now()->format('Y/m/d').'/'.$token.'_'.$safeName.'.'.$ext;
 
-        $stream = fopen($pdfPath, 'rb');
+        $stream = fopen($filePath, 'rb');
         Storage::disk('s3')->put($path, $stream);
         if (is_resource($stream)) {
             fclose($stream);
@@ -182,7 +188,7 @@ class ProcessBulkZipUpload implements ShouldQueue
     /**
      * @return array<int, string>
      */
-    private function collectPdfFilesFromZip(string $zipPath, string $extractRoot): array
+    private function collectUploadableFilesFromZip(string $zipPath, string $extractRoot): array
     {
         $zip = new ZipArchive();
         if ($zip->open($zipPath) !== true) {
@@ -197,7 +203,7 @@ class ProcessBulkZipUpload implements ShouldQueue
         $zip->extractTo($extractHere);
         $zip->close();
 
-        $pdfFiles = [];
+        $files = [];
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($extractHere, \FilesystemIterator::SKIP_DOTS)
         );
@@ -210,20 +216,12 @@ class ProcessBulkZipUpload implements ShouldQueue
             $ext = strtolower($file->getExtension());
             $path = $file->getPathname();
 
-            if ($ext === 'pdf') {
-                $pdfFiles[] = $path;
-                continue;
-            }
-
-            if ($ext === 'zip') {
-                $nestedPdf = $this->collectPdfFilesFromZip($path, $extractRoot);
-                foreach ($nestedPdf as $p) {
-                    $pdfFiles[] = $p;
-                }
+            if (in_array($ext, ['pdf', 'zip'], true)) {
+                $files[] = $path;
             }
         }
 
-        return $pdfFiles;
+        return $files;
     }
 
     private function deleteDir(string $dir): void

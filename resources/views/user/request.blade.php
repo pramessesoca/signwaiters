@@ -48,7 +48,9 @@
             </div>
             <div>
                 <input id="file-zip-generated" type="file" name="file_zip" class="hidden">
+                <input id="upload-kind" type="hidden" name="upload_kind" value="">
                 @error('file_zip') <small class="mt-1 block text-sm text-red-600">{{ $message }}</small> @enderror
+                @error('upload_kind') <small class="mt-1 block text-sm text-red-600">{{ $message }}</small> @enderror
             </div>
             <div id="client-error" class="hidden rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600"></div>
             <div id="preparing-zip" class="hidden rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
@@ -70,6 +72,7 @@
             const btnSubmit = document.getElementById('btn-submit');
             const inputFiles = document.getElementById('input-files');
             const generatedZipInput = document.getElementById('file-zip-generated');
+            const uploadKindInput = document.getElementById('upload-kind');
             const clientError = document.getElementById('client-error');
             const preparingZip = document.getElementById('preparing-zip');
 
@@ -116,6 +119,7 @@
                 }
 
                 if (zipFiles.length === 1) {
+                    uploadKindInput.value = 'zip_direct';
                     dt.items.add(zipFiles[0]);
                 } else {
                     if (pdfFiles.length !== files.length) {
@@ -136,8 +140,10 @@
                     }
 
                     if (pdfFiles.length === 1) {
+                        uploadKindInput.value = 'single_pdf';
                         dt.items.add(pdfFiles[0]);
                     } else {
+                        uploadKindInput.value = 'multi_pdf';
                         if (typeof JSZip === 'undefined') {
                             showError('Library ZIP belum tersedia. Refresh halaman lalu coba lagi.');
                             return;
