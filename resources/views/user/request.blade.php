@@ -47,7 +47,7 @@
                 <input id="input-files" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500" type="file" accept="application/pdf,.pdf,.zip,application/zip" multiple required>
             </div>
             <div>
-                <input id="file-zip-generated" type="file" name="file_zip" class="hidden" required>
+                <input id="file-zip-generated" type="file" name="file_zip" class="hidden">
                 @error('file_zip') <small class="mt-1 block text-sm text-red-600">{{ $message }}</small> @enderror
             </div>
             <div id="client-error" class="hidden rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600"></div>
