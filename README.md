@@ -11,7 +11,9 @@ Penyimpanan file menggunakan MinIO (S3-compatible), cache/session menggunakan Re
 ## Fitur Utama
 
 ### User (Publik)
-- Form permohonan file (`nama`, `tim`, `file PDF`).
+- Form permohonan file (`nama`, `tim`) dengan mode upload:
+  - `multi_pdf`: upload maksimal 10 PDF (masing-masing maksimal 10MB), lalu browser otomatis membuat ZIP.
+  - `zip`: upload ZIP langsung.
 - Generate token otomatis.
 - Cek status berdasarkan token.
 - Download file TTE jika status `siap`.
@@ -45,7 +47,7 @@ Penyimpanan file menggunakan MinIO (S3-compatible), cache/session menggunakan Re
 
 ## Struktur Alur Sistem
 
-1. User submit permohonan PDF.
+1. User submit permohonan (multi PDF yang di-zip otomatis, atau ZIP langsung).
 2. Sistem simpan file ke MinIO (`request/YYYY/MM/DD/...`) dan buat token 8 karakter.
 3. Admin review data di dashboard.
 4. Admin upload file TTE (manual atau bulk ZIP).
@@ -187,7 +189,9 @@ Contoh 4 worker sekaligus:
 
 ### User
 - Buka `/permohonan`.
-- Isi form dan upload PDF.
+- Isi form lalu pilih mode upload:
+  - `multi_pdf`: pilih 1-10 file PDF (maks 10MB per file), sistem zip di browser.
+  - `zip`: upload ZIP langsung.
 - Simpan token yang dihasilkan.
 - Cek status di `/cek-token`.
 - Jika status `siap`, download dari tombol unduh.
@@ -235,6 +239,9 @@ Contoh 4 worker sekaligus:
 - `POST /api/status`
 - `GET /api/download/{token}`
 - `POST /api/admin/login`
+
+Catatan `POST /api/request`:
+- payload mengikuti kontrak baru: `nama`, `tim`, `mode_upload`, `file_zip`.
 
 ## Deploy Production
 
@@ -302,6 +309,10 @@ php artisan queue:work redis --queue=default --sleep=1 --tries=3 --timeout=1800
 ## Troubleshooting Cepat
 
 - Bulk tidak jalan: cek worker `queue:work`.
+
+## Catatan Browser
+
+Mode `multi_pdf` membutuhkan JavaScript aktif dan browser modern karena proses ZIP dilakukan di sisi browser.
 - Upload ZIP gagal: cek `upload_max_filesize` dan `post_max_size`.
 - Error Redis connection refused: pastikan Redis service aktif.
 - File download not found: cek object path di DB dan bucket MinIO.

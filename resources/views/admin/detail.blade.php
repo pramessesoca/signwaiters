@@ -57,7 +57,8 @@
         <form action="{{ route('admin.request.unggah_tte', $item) }}" method="POST" enctype="multipart/form-data" class="space-y-4">
             @csrf
             <div>
-                <input class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500" type="file" name="file_tte" accept="application/pdf" required>
+                <p class="mb-1 text-sm text-slate-600">Format file: PDF atau ZIP (maks. 100MB).</p>
+                <input class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500" type="file" name="file_tte" accept="application/pdf,.zip,application/zip" required>
             </div>
             <div>
                 <button class="rounded-xl bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700" type="submit">Upload File TTE</button>

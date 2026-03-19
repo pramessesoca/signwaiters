@@ -15,14 +15,18 @@ class TteRequestController extends Controller
         $data = $request->validate([
             'nama' => ['required', 'string', 'max:255'],
             'tim' => ['required', 'string', 'in:'.implode(',', TteRequest::listTim())],
-            'file' => ['required', 'file', 'mimes:pdf', 'max:10240'],
+            'mode_upload' => ['required', 'in:multi_pdf,zip'],
+            'file_zip' => ['required', 'file', 'mimes:zip', 'max:102400'],
         ]);
 
         $token = TteRequest::buatTokenUnik();
-        $file = $data['file'];
+        $file = $data['file_zip'];
         $today = now()->format('Y/m/d');
-        $namaFile = $token . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
-        $path = $file->storeAs("request/{$today}", $namaFile . '.pdf', 's3');
+        $baseName = $data['mode_upload'] === 'multi_pdf'
+            ? 'multi-dokumen'
+            : pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $namaFile = $token.'_'.Str::slug($baseName);
+        $path = $file->storeAs("request/{$today}", $namaFile.'.zip', 's3');
 
         $permohonan = TteRequest::create([
             'nama' => $data['nama'],
@@ -88,12 +92,15 @@ class TteRequestController extends Controller
         }
 
         $stream = Storage::disk('s3')->readStream($permohonan->file_tte);
-        $namaUnduh = 'tte_' . $permohonan->token . '.pdf';
+        $extension = strtolower((string) pathinfo($permohonan->file_tte, PATHINFO_EXTENSION));
+        $isZip = $extension === 'zip';
+        $namaUnduh = $isZip ? 'tte_'.$permohonan->token.'.zip' : 'tte_'.$permohonan->token.'.pdf';
+        $contentType = $isZip ? 'application/zip' : 'application/pdf';
 
         return response()->streamDownload(
             fn () => fpassthru($stream),
             $namaUnduh,
-            ['Content-Type' => 'application/pdf']
+            ['Content-Type' => $contentType]
         );
     }
 
@@ -129,13 +136,15 @@ class TteRequestController extends Controller
     public function unggahTte(Request $request, TteRequest $tteRequest)
     {
         $data = $request->validate([
-            'file_tte' => ['required', 'file', 'mimes:pdf', 'max:10240'],
+            'file_tte' => ['required', 'file', 'mimes:pdf,zip', 'max:102400'],
         ]);
 
         $file = $data['file_tte'];
         $today = now()->format('Y/m/d');
-        $namaFile = $tteRequest->token . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
-        $path = $file->storeAs("tte/{$today}", $namaFile . '.pdf', 's3');
+        $namaFile = $tteRequest->token.'_'.Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
+        $ext = strtolower((string) $file->getClientOriginalExtension());
+        $ext = $ext === 'zip' ? 'zip' : 'pdf';
+        $path = $file->storeAs("tte/{$today}", $namaFile.'.'.$ext, 's3');
 
         $tteRequest->update([
             'status' => TteRequest::STATUS_SIAP,

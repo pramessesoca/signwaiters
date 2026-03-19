@@ -310,13 +310,15 @@ class AdminPanelController extends Controller
     public function unggahTte(Request $request, TteRequest $tteRequest)
     {
         $data = $request->validate([
-            'file_tte' => ['required', 'file', 'mimes:pdf', 'max:10240'],
+            'file_tte' => ['required', 'file', 'mimes:pdf,zip', 'max:102400'],
         ]);
 
         $file = $data['file_tte'];
         $tanggal = now()->format('Y/m/d');
         $namaAsli = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-        $namaFile = $tteRequest->token.'_'.Str::slug($namaAsli).'.pdf';
+        $ext = strtolower((string) $file->getClientOriginalExtension());
+        $ext = $ext === 'zip' ? 'zip' : 'pdf';
+        $namaFile = $tteRequest->token.'_'.Str::slug($namaAsli).'.'.$ext;
         $path = $file->storeAs("tte/{$tanggal}", $namaFile, 's3');
 
         $tteRequest->update([

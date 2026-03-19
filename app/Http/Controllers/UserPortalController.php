@@ -21,14 +21,17 @@ class UserPortalController extends Controller
         $data = $request->validate([
             'nama' => ['required', 'string', 'max:255'],
             'tim' => ['required', 'string', 'in:'.implode(',', TteRequest::listTim())],
-            'file' => ['required', 'file', 'mimes:pdf', 'max:10240'],
+            'mode_upload' => ['required', 'in:multi_pdf,zip'],
+            'file_zip' => ['required', 'file', 'mimes:zip', 'max:102400'],
         ]);
 
         $token = TteRequest::buatTokenUnik();
-        $file = $data['file'];
+        $file = $data['file_zip'];
         $tanggal = now()->format('Y/m/d');
-        $namaAsli = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-        $namaFile = $token.'_'.Str::slug($namaAsli).'.pdf';
+        $baseName = $data['mode_upload'] === 'multi_pdf'
+            ? 'multi-dokumen'
+            : pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $namaFile = $token.'_'.Str::slug($baseName).'.zip';
         $path = $file->storeAs("request/{$tanggal}", $namaFile, 's3');
 
         TteRequest::query()->create([
@@ -95,11 +98,15 @@ class UserPortalController extends Controller
         }
 
         $stream = Storage::disk('s3')->readStream($permohonan->file_tte);
+        $extension = strtolower((string) pathinfo($permohonan->file_tte, PATHINFO_EXTENSION));
+        $isZip = $extension === 'zip';
+        $downloadName = $isZip ? 'tte_'.$permohonan->token.'.zip' : 'tte_'.$permohonan->token.'.pdf';
+        $contentType = $isZip ? 'application/zip' : 'application/pdf';
 
         return response()->streamDownload(
             fn () => fpassthru($stream),
-            'tte_'.$permohonan->token.'.pdf',
-            ['Content-Type' => 'application/pdf']
+            $downloadName,
+            ['Content-Type' => $contentType]
         );
     }
 }
