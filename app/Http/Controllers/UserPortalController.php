@@ -21,17 +21,21 @@ class UserPortalController extends Controller
         $data = $request->validate([
             'nama' => ['required', 'string', 'max:255'],
             'tim' => ['required', 'string', 'in:'.implode(',', TteRequest::listTim())],
-            'mode_upload' => ['required', 'in:multi_pdf,zip'],
-            'file_zip' => ['required', 'file', 'mimes:zip', 'max:102400'],
+            'file_zip' => ['required', 'file', 'mimes:pdf,zip', 'max:102400'],
         ]);
 
         $token = TteRequest::buatTokenUnik();
         $file = $data['file_zip'];
         $tanggal = now()->format('Y/m/d');
-        $baseName = $data['mode_upload'] === 'multi_pdf'
-            ? 'multi-dokumen'
-            : pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-        $namaFile = $token.'_'.Str::slug($baseName).'.zip';
+        $baseName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $ext = strtolower((string) $file->getClientOriginalExtension());
+        $ext = $ext === 'zip' ? 'zip' : 'pdf';
+        if ($ext === 'pdf' && $file->getSize() > 10 * 1024 * 1024) {
+            return back()
+                ->withErrors(['file_zip' => 'Ukuran file PDF maksimal 10MB.'])
+                ->withInput();
+        }
+        $namaFile = $token.'_'.Str::slug($baseName).'.'.$ext;
         $path = $file->storeAs("request/{$tanggal}", $namaFile, 's3');
 
         TteRequest::query()->create([
