@@ -8,8 +8,22 @@ use Illuminate\Support\Facades\Hash;
 
 class AdminSessionController extends Controller
 {
-    public function formLogin()
+    public function formLogin(Request $request)
     {
+        $adminId = $request->session()->get('admin_id');
+        if ($adminId) {
+            $admin = User::query()
+                ->where('id', $adminId)
+                ->where('is_admin', true)
+                ->first();
+
+            if ($admin) {
+                return redirect()->route('admin.dashboard');
+            }
+
+            $request->session()->forget('admin_id');
+        }
+
         return view('admin.login');
     }
 

@@ -3,14 +3,14 @@
 @section('content')
     <div class="mb-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
         <h2 class="text-xl font-bold text-slate-900">Form Permohonan TTE</h2>
-        <p class="mt-1 text-sm text-slate-600">Upload bisa PDF tunggal, multiple PDF (otomatis jadi ZIP), atau 1 file ZIP langsung.</p>
+        <p class="mt-1 text-sm text-slate-600">Pastikan file yang dikirim sesuai dengan ketentuan agar dapat diproses</p>
     </div>
 
     <div class="mb-4 rounded-2xl border border-blue-200 bg-blue-50 p-5">
         <h3 class="text-base font-semibold text-blue-900">Petunjuk Penggunaan</h3>
         <ol class="mt-2 list-decimal space-y-1 pl-5 text-sm text-blue-900">
             <li>Isi <strong>Nama</strong> dan pilih <strong>Tim Kerja</strong></li>
-            <li>Bisa upload PDF (maks. 10 file) dan ZIP (berisi max. 10 pdf)</li>
+            <li>Bisa upload PDF (maks. 10 file) atau ZIP (berisi max. 10 pdf)</li>
             <li>Maks ukuran 10 MB per file</li>
             <li>Setelah berhasil, simpan token yang muncul untuk cek status dan unduh hasil</li>
         </ol>
