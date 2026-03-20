@@ -10,8 +10,9 @@
         <h3 class="text-base font-semibold text-blue-900">Petunjuk Penggunaan</h3>
         <ol class="mt-2 list-decimal space-y-1 pl-5 text-sm text-blue-900">
             <li>Isi <strong>Nama</strong> dan pilih <strong>Tim Kerja</strong></li>
-            <li>Bisa upload PDF (maks. 10 file) atau ZIP (berisi max. 10 pdf)</li>
+            <li>Bisa upload PDF (maks. 10 file) atau 1 ZIP</li>
             <li>Maks ukuran 20 MB per file PDF</li>
+            <li>Jika upload ZIP: isi ZIP wajib hanya PDF, tanpa folder, maksimal 10 file</li>
             <li>Setelah berhasil, simpan token yang muncul untuk cek status dan unduh hasil</li>
         </ol>
     </div>

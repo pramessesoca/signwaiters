@@ -6,6 +6,89 @@ use Illuminate\Support\Str;
 
 class ZipTokenNormalizer
 {
+    /**
+     * @return array{valid: bool, message: string|null, total_pdf: int}
+     */
+    public static function validateZipContent(string $sourceZipPath, int $maxPdf = 10): array
+    {
+        $zip = new \ZipArchive();
+        if ($zip->open($sourceZipPath) !== true) {
+            return [
+                'valid' => false,
+                'message' => 'ZIP tidak bisa dibuka atau rusak.',
+                'total_pdf' => 0,
+            ];
+        }
+
+        $pdfCount = 0;
+
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $name = (string) $zip->getNameIndex($i);
+            if ($name === '') {
+                continue;
+            }
+
+            $normalizedName = str_replace('\\', '/', $name);
+            if (str_ends_with($normalizedName, '/')) {
+                $zip->close();
+
+                return [
+                    'valid' => false,
+                    'message' => 'ZIP tidak boleh berisi folder.',
+                    'total_pdf' => $pdfCount,
+                ];
+            }
+
+            if (str_contains($normalizedName, '/')) {
+                $zip->close();
+
+                return [
+                    'valid' => false,
+                    'message' => 'ZIP harus berisi file PDF di root, tanpa folder.',
+                    'total_pdf' => $pdfCount,
+                ];
+            }
+
+            $extension = strtolower((string) pathinfo($normalizedName, PATHINFO_EXTENSION));
+            if ($extension !== 'pdf') {
+                $zip->close();
+
+                return [
+                    'valid' => false,
+                    'message' => 'ZIP hanya boleh berisi file PDF.',
+                    'total_pdf' => $pdfCount,
+                ];
+            }
+
+            $pdfCount++;
+            if ($pdfCount > $maxPdf) {
+                $zip->close();
+
+                return [
+                    'valid' => false,
+                    'message' => 'Maksimal '.$maxPdf.' file PDF di dalam ZIP.',
+                    'total_pdf' => $pdfCount,
+                ];
+            }
+        }
+
+        $zip->close();
+
+        if ($pdfCount === 0) {
+            return [
+                'valid' => false,
+                'message' => 'ZIP tidak berisi file PDF.',
+                'total_pdf' => 0,
+            ];
+        }
+
+        return [
+            'valid' => true,
+            'message' => null,
+            'total_pdf' => $pdfCount,
+        ];
+    }
+
     public static function normalizeWithToken(string $sourceZipPath, string $token, string $prefix = 'zip_req'): string
     {
         $tempExtractDir = storage_path('app/tmp/'.$prefix.'_'.Str::random(12));
@@ -90,4 +173,3 @@ class ZipTokenNormalizer
         rmdir($dir);
     }
 }
-

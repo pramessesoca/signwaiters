@@ -37,6 +37,15 @@ class UserPortalController extends Controller
                 ->withErrors(['file_zip' => 'Ukuran file PDF maksimal 20MB.'])
                 ->withInput();
         }
+        if ($ext === 'zip') {
+            $zipValidation = ZipTokenNormalizer::validateZipContent($file->getRealPath(), 10);
+            if (! $zipValidation['valid']) {
+                return back()
+                    ->withErrors(['file_zip' => $zipValidation['message'] ?? 'Isi ZIP tidak valid.'])
+                    ->withInput();
+            }
+        }
+
         $namaFile = $token.'_'.Str::slug($baseName).'.'.$ext;
         if ($ext === 'zip' && ($data['upload_kind'] ?? '') === 'multi_pdf') {
             $normalizedZipPath = ZipTokenNormalizer::normalizeWithToken($file->getRealPath(), $token, 'zip_req_web');

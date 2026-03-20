@@ -93,7 +93,6 @@
             <div class="flex items-end">
                 <div class="flex gap-2">
                     <button class="rounded-xl bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700" type="submit">Terapkan</button>
-                    <button class="rounded-xl bg-amber-500 px-4 py-2 font-medium text-white hover:bg-amber-600" type="submit" name="clear_tanggal" value="1">Clear Tanggal</button>
                     <a href="{{ route('admin.dashboard') }}" class="rounded-xl bg-slate-200 px-4 py-2 font-medium text-slate-700 hover:bg-slate-300">Reset</a>
                 </div>
             </div>

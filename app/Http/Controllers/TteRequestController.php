@@ -29,6 +29,15 @@ class TteRequestController extends Controller
         if ($ext === 'pdf' && $file->getSize() > 20 * 1024 * 1024) {
             return response()->json(['pesan' => 'Ukuran file PDF maksimal 20MB.'], 422);
         }
+        if ($ext === 'zip') {
+            $zipValidation = ZipTokenNormalizer::validateZipContent($file->getRealPath(), 10);
+            if (! $zipValidation['valid']) {
+                return response()->json([
+                    'pesan' => $zipValidation['message'] ?? 'Isi ZIP tidak valid.',
+                ], 422);
+            }
+        }
+
         $namaFile = $token.'_'.Str::slug($baseName);
         $targetFilename = $namaFile.'.'.$ext;
 

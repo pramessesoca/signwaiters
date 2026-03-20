@@ -13,7 +13,8 @@ Penyimpanan file menggunakan MinIO (S3-compatible), cache/session menggunakan Re
 ### User (Publik)
 - Form permohonan file (`nama`, `tim`) dengan mode upload:
   - `multi_pdf`: upload maksimal 10 PDF (masing-masing maksimal 20MB), lalu browser otomatis membuat ZIP.
-  - `zip`: upload ZIP langsung.
+  - `zip`: upload 1 ZIP langsung.
+  - Validasi ZIP user: isi ZIP wajib hanya file PDF, tanpa folder, maksimal 10 file PDF.
 - Generate token otomatis.
 - Cek status berdasarkan token.
 - Download file TTE jika status `siap`.
@@ -191,7 +192,7 @@ Contoh 4 worker sekaligus:
 - Buka `/permohonan`.
 - Isi form lalu pilih mode upload:
   - `multi_pdf`: pilih 1-10 file PDF (maks 20MB per file), sistem zip di browser.
-  - `zip`: upload ZIP langsung.
+  - `zip`: upload 1 ZIP langsung (isi wajib hanya PDF, tanpa folder, maksimal 10 file).
 - Simpan token yang dihasilkan.
 - Cek status di `/cek-token`.
 - Jika status `siap`, download dari tombol unduh.
@@ -211,6 +212,7 @@ Contoh 4 worker sekaligus:
 
 ### Bulk Download ZIP
 - Dari dashboard, trigger bulk download sesuai filter aktif.
+- Sistem memproses maksimal 100 file per batch.
 - Proses berjalan via queue.
 - Pantau di `/admin/bulk-download?bulk_download_id=...`.
 - Saat selesai, ZIP auto terunduh.
