@@ -20,6 +20,7 @@ class TteRequest extends Model
         'Digital Forensic',
         'Incident Response',
         'Infrastruktur',
+        'TU D2',
     ];
 
     public const STATUS_TUNGGU = 'tunggu';
