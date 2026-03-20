@@ -12,7 +12,7 @@ Penyimpanan file menggunakan MinIO (S3-compatible), cache/session menggunakan Re
 
 ### User (Publik)
 - Form permohonan file (`nama`, `tim`) dengan mode upload:
-  - `multi_pdf`: upload maksimal 10 PDF (masing-masing maksimal 10MB), lalu browser otomatis membuat ZIP.
+  - `multi_pdf`: upload maksimal 10 PDF (masing-masing maksimal 20MB), lalu browser otomatis membuat ZIP.
   - `zip`: upload ZIP langsung.
 - Generate token otomatis.
 - Cek status berdasarkan token.
@@ -190,7 +190,7 @@ Contoh 4 worker sekaligus:
 ### User
 - Buka `/permohonan`.
 - Isi form lalu pilih mode upload:
-  - `multi_pdf`: pilih 1-10 file PDF (maks 10MB per file), sistem zip di browser.
+  - `multi_pdf`: pilih 1-10 file PDF (maks 20MB per file), sistem zip di browser.
   - `zip`: upload ZIP langsung.
 - Simpan token yang dihasilkan.
 - Cek status di `/cek-token`.

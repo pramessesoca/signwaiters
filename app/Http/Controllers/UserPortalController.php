@@ -32,9 +32,9 @@ class UserPortalController extends Controller
         $baseName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
         $ext = strtolower((string) $file->getClientOriginalExtension());
         $ext = $ext === 'zip' ? 'zip' : 'pdf';
-        if ($ext === 'pdf' && $file->getSize() > 10 * 1024 * 1024) {
+        if ($ext === 'pdf' && $file->getSize() > 20 * 1024 * 1024) {
             return back()
-                ->withErrors(['file_zip' => 'Ukuran file PDF maksimal 10MB.'])
+                ->withErrors(['file_zip' => 'Ukuran file PDF maksimal 20MB.'])
                 ->withInput();
         }
         $namaFile = $token.'_'.Str::slug($baseName).'.'.$ext;

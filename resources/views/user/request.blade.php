@@ -11,7 +11,7 @@
         <ol class="mt-2 list-decimal space-y-1 pl-5 text-sm text-blue-900">
             <li>Isi <strong>Nama</strong> dan pilih <strong>Tim Kerja</strong></li>
             <li>Bisa upload PDF (maks. 10 file) atau ZIP (berisi max. 10 pdf)</li>
-            <li>Maks ukuran 10 MB per file</li>
+            <li>Maks ukuran 20 MB per file PDF</li>
             <li>Setelah berhasil, simpan token yang muncul untuk cek status dan unduh hasil</li>
         </ol>
     </div>
@@ -66,7 +66,7 @@
     <script>
         (function () {
             const MAX_FILES = 10;
-            const MAX_FILE_SIZE = 10 * 1024 * 1024;
+            const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
             const form = document.getElementById('form-permohonan');
             const btnSubmit = document.getElementById('btn-submit');
@@ -134,7 +134,7 @@
 
                     for (const file of pdfFiles) {
                         if (file.size > MAX_FILE_SIZE) {
-                            showError(`Ukuran file ${file.name} melebihi 10MB.`);
+                            showError(`Ukuran file ${file.name} melebihi 20MB.`);
                             return;
                         }
                     }

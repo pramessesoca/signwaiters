@@ -16,7 +16,16 @@ class AdminPanelController extends Controller
 {
     public function dashboard(Request $request)
     {
-        if (! $request->filled('tgl_dari')) {
+        $filterKeys = ['q', 'status', 'tim', 'tgl_dari', 'tgl_sampai', 'per_page', 'sort', 'dir', 'clear_tanggal'];
+        $hasAnyFilterParam = collect($filterKeys)->contains(fn ($key) => $request->has($key));
+        $clearTanggal = $request->boolean('clear_tanggal');
+
+        if ($clearTanggal) {
+            $request->merge([
+                'tgl_dari' => '',
+                'tgl_sampai' => '',
+            ]);
+        } elseif (! $hasAnyFilterParam) {
             $request->merge([
                 'tgl_dari' => now()->toDateString(),
             ]);
@@ -40,6 +49,7 @@ class AdminPanelController extends Controller
             'listTim' => TteRequest::listTim(),
             'sortBy' => $validated['sort'],
             'sortDir' => $validated['dir'],
+            'clearTanggal' => $clearTanggal,
         ]);
     }
 

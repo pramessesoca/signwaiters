@@ -26,8 +26,8 @@ class TteRequestController extends Controller
         $baseName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
         $ext = strtolower((string) $file->getClientOriginalExtension());
         $ext = $ext === 'zip' ? 'zip' : 'pdf';
-        if ($ext === 'pdf' && $file->getSize() > 10 * 1024 * 1024) {
-            return response()->json(['pesan' => 'Ukuran file PDF maksimal 10MB.'], 422);
+        if ($ext === 'pdf' && $file->getSize() > 20 * 1024 * 1024) {
+            return response()->json(['pesan' => 'Ukuran file PDF maksimal 20MB.'], 422);
         }
         $namaFile = $token.'_'.Str::slug($baseName);
         $targetFilename = $namaFile.'.'.$ext;
