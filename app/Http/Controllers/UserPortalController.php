@@ -126,7 +126,9 @@ class UserPortalController extends Controller
         $stream = Storage::disk('s3')->readStream($permohonan->file_tte);
         $extension = strtolower((string) pathinfo($permohonan->file_tte, PATHINFO_EXTENSION));
         $isZip = $extension === 'zip';
-        $downloadName = $isZip ? 'tte_'.$permohonan->token.'.zip' : 'tte_'.$permohonan->token.'.pdf';
+        $downloadName = $isZip
+            ? 'tte_'.$permohonan->token.'.zip'
+            : basename($permohonan->file_tte);
         $contentType = $isZip ? 'application/zip' : 'application/pdf';
 
         return response()->streamDownload(

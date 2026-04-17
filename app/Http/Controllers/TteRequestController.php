@@ -120,7 +120,9 @@ class TteRequestController extends Controller
         $stream = Storage::disk('s3')->readStream($permohonan->file_tte);
         $extension = strtolower((string) pathinfo($permohonan->file_tte, PATHINFO_EXTENSION));
         $isZip = $extension === 'zip';
-        $namaUnduh = $isZip ? 'tte_'.$permohonan->token.'.zip' : 'tte_'.$permohonan->token.'.pdf';
+        $namaUnduh = $isZip
+            ? 'tte_'.$permohonan->token.'.zip'
+            : basename($permohonan->file_tte);
         $contentType = $isZip ? 'application/zip' : 'application/pdf';
 
         return response()->streamDownload(
